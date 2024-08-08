@@ -1,2 +1,4 @@
 # tvm-uma
-TVM UMA practive
+Implementing operators for TVM practice.  
+Added operator.  
+- Matrix add
