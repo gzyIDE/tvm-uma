@@ -20,90 +20,39 @@ import tvm
 from tvm import tir
 from tvm.relay.backend.contrib.uma.api.utils import add_llvm_to_block
 from functools import reduce
+import op_injective
 
-@tvm.tir.transform.prim_func_pass(opt_level=2)
-class VanillaAcceleratorAddPass:
-    _EXTERNAL_FUNCTION_NAME = "vanilla_accelerator_addvec"
-    _TVM_BLOCK_MATCH_NAME = "T_add"
+def has_block(name: str, func: tvm.tir.PrimFunc) -> bool:
+    """
+    Determine of a tir.block with `name` exists in `func`
+    """
+    def _hb(op):
+        if isinstance(op, tvm.tir.Block):
+            found_blocks.append(op.name_hint)
 
-    def transform_function(
-        self, func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
-    ) -> tvm.tir.PrimFunc:
-        return self._vanilla_accelerator_add_pass(func, mod, ctx)
+    found_blocks = []
+    tvm.tir.stmt_functor.post_order_visit(func.body, _hb)
+    return name in found_blocks
 
-    @classmethod
-    def _vanilla_accelerator_add_pass(cls, func, mod, ctx):
-        _loops = dict()
-        _handles = []
-        _entry_node = None
+def find_blocks(name: str, func: tvm.tir.PrimFunc) :
+    def _hb(op):
+        if isinstance(op, tvm.tir.Block):
+            found_blocks.append(op.name_hint)
 
-        def _has_block(name: str, func: tvm.tir.PrimFunc) -> bool:
-            """
-            Determine of a tir.block with `name` exists in `func`
-            """
+    found_blocks = []
+    tvm.tir.stmt_functor.post_order_visit(func.body, _hb)
+    return list(filter(lambda x: name in x, found_blocks))
 
-            def _hb(op):
-                if isinstance(op, tvm.tir.Block):
-                    _found_blocks.append(op.name_hint)
+def stmt_analysis(stmt: tvm.tir.Stmt) -> bool:
+    def _hb(op):
+        if isinstance(op, tvm.tir.Block):
+            input_buf.extend(map(lambda x: x.buffer, op.reads))
+            output_buf.extend(map(lambda x: x.buffer, op.writes))
 
-            _found_blocks = []
-            tvm.tir.stmt_functor.post_order_visit(func.body, _hb)
-            return name in _found_blocks
-
-        def _detect_and_replace_add(
-            func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
-        ) -> tvm.tir.PrimFunc:
-            def _replace_add(op):
-                if op == _entry_node:
-                    in1       = _handles[0][1]
-                    in2       = _handles[1][1]
-                    out       = _handles[2][1]
-                    in1_shape = in1.shape
-                    in2_shape = in2.shape
-                    in1_elm   = int(reduce(lambda x, y: x * y, in1_shape))
-                    in2_elm   = int(reduce(lambda x, y: x * y, in2_shape))
-                    if in1_elm < in2_elm :
-                        width = in2_elm
-                        bc    = in2_elm // in1_elm
-                        args  = [in2.data, in1.data, out.data, width, bc]
-                        fname = cls._EXTERNAL_FUNCTION_NAME + "_bc"
-                    elif in1_elm > in2_elm :
-                        width = in1_elm
-                        bc    = in1_elm // in2_elm
-                        args  = [in1.data, in2.data, out.data, width, bc]
-                        fname = cls._EXTERNAL_FUNCTION_NAME + "_bc"
-                    else :
-                        width = in1_elm
-                        args  = [in1.data, in2.data, out.data, width]
-                        fname = cls._EXTERNAL_FUNCTION_NAME
-
-                    irb = tvm.tir.ir_builder.create()
-                    irb.emit(tir_call(irb, True, fname, *args))
-                    return irb.get()
-                elif isinstance(op, tvm.tir.SeqStmt):
-                    # Remove that pad block of TOPI's conv2DNCHW by only returning the 2nd statement
-                    return op.seq[1]
-                return op
-
-            sch = tir.Schedule(func)
-
-            if _has_block(cls._TVM_BLOCK_MATCH_NAME, func):
-                add_block   = sch.get_block(cls._TVM_BLOCK_MATCH_NAME)
-                rv_loops    = sch.get_loops(add_block)
-                _entry_node = sch.get(rv_loops[0])
-                _loops      = [sch.get(v) for v in rv_loops]
-                _handles    = func.buffer_map.items()
-
-                x = tvm.tir.stmt_functor.ir_transform(
-                    func.body, None, _replace_add, ["tir.For", "tir.SeqStmt"]
-                )
-                return func.with_body(x)
-            else:
-                return func
-
-        r = _detect_and_replace_add(func, mod, ctx)
-        return r
-
+    input_buf = []
+    output_buf = []
+    tvm.tir.stmt_functor.post_order_visit(stmt.body, _hb)
+    return (input_buf, output_buf)
 
 @tvm.tir.transform.prim_func_pass(opt_level=2)
 class VanillaAcceleratorConv2dPass:
@@ -120,19 +69,6 @@ class VanillaAcceleratorConv2dPass:
         _loops = dict()
         _handles = []
         _entry_node = None
-
-        def _has_block(name: str, func: tvm.tir.PrimFunc) -> bool:
-            """
-            Determine of a tir.block with `name` exists in `func`
-            """
-
-            def _hb(op):
-                if isinstance(op, tvm.tir.Block):
-                    _found_blocks.append(op.name_hint)
-
-            _found_blocks = []
-            tvm.tir.stmt_functor.post_order_visit(func.body, _hb)
-            return name in _found_blocks
 
         def _detect_and_replace_conv2d(
             func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
@@ -158,7 +94,7 @@ class VanillaAcceleratorConv2dPass:
 
             sch = tir.Schedule(func)
 
-            if _has_block(cls._TVM_BLOCK_MATCH_NAME, func):
+            if has_block(cls._TVM_BLOCK_MATCH_NAME, func):
                 conv2d_block = sch.get_block(cls._TVM_BLOCK_MATCH_NAME)
                 rv_loops = sch.get_loops(conv2d_block)
                 assert len(rv_loops) == 7
@@ -183,6 +119,97 @@ class VanillaAcceleratorConv2dPass:
                 return func
 
         r = _detect_and_replace_conv2d(func, mod, ctx)
+        return r
+
+@tvm.tir.transform.prim_func_pass(opt_level=2)
+class VanillaAcceleratorTirPass:
+    _TVM_BLOCK_MATCH_NAME = "T_add"
+    _EXTERNAL_FUNCTION_NAME = "vanilla_accelerator_addvec"
+
+    def transform_function(
+        self, func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
+    ) -> tvm.tir.PrimFunc:
+        return self._vanilla_accelerator_add_pass(func, mod, ctx)
+
+    @classmethod
+    def _vanilla_accelerator_add_pass(cls, func, mod, ctx):
+        _loops = dict()
+        _handles = []
+        _entry_node = None
+
+        def _detect_and_replace_add(
+            func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
+        ) -> tvm.tir.PrimFunc:
+            def _replace_add(op):
+
+                if op == _entry_node:
+                    (inputs, outputs) = stmt_analysis(op)
+                    in1       = inputs[0]
+                    in2       = inputs[1]
+                    out       = outputs[0]
+                    in1_elm   = int(reduce(lambda x, y: x * y, in1.shape))
+                    in2_elm   = int(reduce(lambda x, y: x * y, in2.shape))
+                    if in1_elm < in2_elm :
+                        width = in2_elm
+                        bc    = in2_elm // in1_elm
+                        args  = [in2.data, in1.data, out.data, width, bc]
+                        fname = cls._EXTERNAL_FUNCTION_NAME + "_bc"
+                    elif in1_elm > in2_elm :
+                        width = in1_elm
+                        bc    = in1_elm // in2_elm
+                        args  = [in1.data, in2.data, out.data, width, bc]
+                        fname = cls._EXTERNAL_FUNCTION_NAME + "_bc"
+                    else :
+                        width = in1_elm
+                        args  = [in1.data, in2.data, out.data, width]
+                        fname = cls._EXTERNAL_FUNCTION_NAME
+
+                    irb = tvm.tir.ir_builder.create()
+                    irb.emit(tir_call(irb, True, fname, *args))
+                    return irb.get()
+                else:
+                    return op
+
+            sch = tir.Schedule(func)
+
+            blk_list = find_blocks(cls._TVM_BLOCK_MATCH_NAME, func)
+            if len(blk_list) != 0:
+                func_update = func
+
+                for blk in blk_list :
+                    add_block   = sch.get_block(blk)
+                    rv_loops    = sch.get_loops(add_block)
+                    _entry_node = sch.get(rv_loops[0])
+                    _loops      = [sch.get(v) for v in rv_loops]
+                    _handles    = func_update.buffer_map.items()
+
+                    x = tvm.tir.stmt_functor.ir_transform(
+                        func_update.body, None, _replace_add, ["tir.For", "tir.SeqStmt"]
+                    )
+
+                    func_update = func.with_body(x)
+
+                return func_update
+            else :
+                return func
+
+
+            #if has_block(cls._TVM_BLOCK_MATCH_NAME, func):
+            #    add_block   = sch.get_block(cls._TVM_BLOCK_MATCH_NAME)
+            #    rv_loops    = sch.get_loops(add_block)
+            #    _entry_node = sch.get(rv_loops[0])
+            #    _loops      = [sch.get(v) for v in rv_loops]
+            #    _handles    = func.buffer_map.items()
+
+            #    x = tvm.tir.stmt_functor.ir_transform(
+            #        func.body, None, _replace_add, ["tir.For", "tir.SeqStmt"]
+            #    )
+
+            #    return func.with_body(x)
+            #else:
+            #    return func
+
+        r = _detect_and_replace_add(func, mod, ctx)
         return r
 
 

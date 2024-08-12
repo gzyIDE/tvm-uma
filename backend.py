@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 """UMA backend for the vanilla_accelerator accelerator"""
-from passes import VanillaAcceleratorConv2dPass
-from passes import VanillaAcceleratorAddPass
+from passes import VanillaAcceleratorTirPass
 from tvm.relay.backend.contrib.uma.api.utils import PassPhase
 from tvm.relay.backend.contrib.uma.backend import UMABackend
 from codegen import gen_includes
@@ -39,7 +38,8 @@ class VanillaAcceleratorBackend(UMABackend):
 
         # Relay to TIR function registration
         #self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorConv2dPass())
-        self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorAddPass())
+        #self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorAddPass())
+        self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorTirPass())
 
         # TIR to runtime function registration
         self._register_codegen(fmt="c", includes=gen_includes)
