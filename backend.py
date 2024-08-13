@@ -33,7 +33,7 @@ class VanillaAcceleratorBackend(UMABackend):
         self._register_target_attr("dimension")
 
         # Relay Pattern registration
-        #self._register_pattern("conv2d", conv2d_pattern())
+        self._register_pattern("conv2d", conv2d_pattern())
         self._register_pattern("add", gzadd_pattern())
 
         # Relay to TIR function registration
