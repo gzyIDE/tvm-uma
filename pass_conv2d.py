@@ -4,10 +4,19 @@ from functools import reduce
 import pass_utils
 
 def get_padding(stmt: tvm.tir.Stmt) :
+    def _check_padding(hvmin):
+        if type(hvmin) is tvm.tir.expr.Var :
+            return 0
+        else :
+            return int(hmin.b)
+
     def _hb(op):
         if isinstance(op, tvm.tir.Block):
-            hpad.extend([int(op.reads[0].region[2].min.b)])
-            vpad.extend([int(op.reads[0].region[3].min.b)])
+            hmin = op.reads[0].region[2].min
+            vmin = op.reads[0].region[3].min
+
+            hpad.extend([_check_padding(hmin)])
+            vpad.extend([_check_padding(vmin)])
 
     hpad = []
     vpad = []

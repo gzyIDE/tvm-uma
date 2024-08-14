@@ -84,6 +84,36 @@ from tvm.testing.aot import (
 #    output_list = generate_ref_data(mod, inputs)
 #    return mod, inputs, output_list, runner
 
+#def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER):
+#    dtype = "float32"
+#    ishape = (1, 32, 14, 14)
+#    wshape = (16, 32, 3, 3)
+#    oshape = (1, 16, 1, 1)
+#    pass_config = {"tir.usmp.enable": True}
+#    runner = AOTRunner(
+#        makefile=runner.makefile,
+#        prologue=runner.prologue,
+#        epilogue=runner.epilogue,
+#        includes=runner.includes,
+#        parameters=runner.parameters,
+#        pass_config=pass_config,
+#    )
+#    data0   = relay.var("data", shape=ishape, dtype=dtype)
+#    weight0 = relay.var("weight", shape=wshape, dtype=dtype)
+#    data1   = relay.var("data1", shape=oshape, dtype=dtype)
+#    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(1, 1), groups=groups)
+#    out     = relay.add(convdt, data1)
+#    main_f  = relay.Function([data0, weight0, data1], out)
+#    mod = tvm.IRModule()
+#    mod["main"] = main_f
+#    mod = transform.InferType()(mod)
+#    i_data = np.random.uniform(0, 1, ishape).astype(dtype)
+#    w1_data = np.random.uniform(0, 1, wshape).astype(dtype)
+#    i_data1 = np.random.uniform(0, 1, oshape).astype(dtype)
+#    inputs = OrderedDict([("data", i_data), ("weight", w1_data), ("data1", i_data1)])
+#    output_list = generate_ref_data(mod, inputs)
+#    return mod, inputs, output_list, runner
+
 def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER):
     dtype = "float32"
     ishape = (1, 32, 14, 14)
@@ -101,7 +131,7 @@ def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER):
     data0   = relay.var("data", shape=ishape, dtype=dtype)
     weight0 = relay.var("weight", shape=wshape, dtype=dtype)
     data1   = relay.var("data1", shape=oshape, dtype=dtype)
-    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(1, 1), groups=groups)
+    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(0, 0), groups=groups)
     out     = relay.add(convdt, data1)
     main_f  = relay.Function([data0, weight0, data1], out)
     mod = tvm.IRModule()
@@ -117,12 +147,17 @@ def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER):
 
 def main():
     mod, inputs, output_list, runner = create_conv2d()
+    with open("model_pre.dump", "w") as f:
+        f.write(str(mod))
 
     uma_backend = VanillaAcceleratorBackend()
     uma_backend.register()
     mod = uma_backend.partition(mod)
     target = tvm.target.Target("vanilla_accelerator", host=tvm.target.Target("c"))
     target_c = tvm.target.Target("c")
+
+    with open("model_post.dump", "w") as f:
+        f.write(str(mod))
 
     #export_directory = tvm.contrib.utils.tempdir(keep_for_debug=True).path
     export_directory = "./result_conv2d"
