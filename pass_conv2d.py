@@ -3,6 +3,18 @@ from tvm import tir
 from functools import reduce
 import pass_utils
 
+def get_padding(stmt: tvm.tir.Stmt) :
+    def _hb(op):
+        if isinstance(op, tvm.tir.Block):
+            hpad.extend([int(op.reads[0].region[2].min.b)])
+            vpad.extend([int(op.reads[0].region[3].min.b)])
+
+    hpad = []
+    vpad = []
+    tvm.tir.stmt_functor.post_order_visit(stmt.body, _hb)
+    return (hpad[0], vpad[0])
+
+
 def conv2d_pass(func, mod, ctx):
     _loops = dict()
     _entry_node = None
@@ -13,6 +25,7 @@ def conv2d_pass(func, mod, ctx):
         def _replace_pad(op):
             if op == _entry_node:
                 (inputs, outputs) = pass_utils.stmt_analysis(op)
+                (hpad, vpad) = get_padding(op)
 
                 irb = tvm.tir.ir_builder.create()
                 # extraction of loop offsets
@@ -20,7 +33,7 @@ def conv2d_pass(func, mod, ctx):
                     assert v.min.value == 0
                 offset_order = ["w", "h", "ci"]
                 offsets = [_loops[i].extent.value for i in offset_order]
-                args = inputs + outputs + offsets + [1, 1]
+                args = inputs + outputs + offsets + [hpad, vpad]
                 irb.emit(pass_utils.tir_call(irb, True, "vanilla_accelerator_pad", *args))
                 irb_result = irb.get()
                 return irb_result

@@ -21,7 +21,7 @@ def find_blocks(name: str, func: tvm.tir.PrimFunc) :
     tvm.tir.stmt_functor.post_order_visit(func.body, _hb)
     return list(filter(lambda x: name in x, found_blocks))
 
-def stmt_analysis(stmt: tvm.tir.Stmt) -> bool:
+def stmt_analysis(stmt: tvm.tir.Stmt) :
     def _hb(op):
         if isinstance(op, tvm.tir.Block):
             input_buf.extend(map(lambda x: x.buffer, op.reads))

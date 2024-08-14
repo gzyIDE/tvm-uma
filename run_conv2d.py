@@ -58,7 +58,7 @@ from tvm.testing.aot import (
 def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
     dtype = "float32"
     ishape = (1, 32, 14, 14)
-    wshape = (32, weight_shape, 3, 3)
+    wshape = (32, weight_shape, 5, 5)
     pass_config = {"tir.usmp.enable": True}
     runner = AOTRunner(
         makefile=runner.makefile,
@@ -71,7 +71,7 @@ def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
     data0   = relay.var("data", shape=ishape, dtype=dtype)
     weight0 = relay.var("weight", shape=wshape, dtype=dtype)
     data1   = relay.var("data1", shape=ishape, dtype=dtype)
-    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(1, 1), groups=groups)
+    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(5, 5), padding=(2, 2), groups=groups)
     out     = relay.add(convdt, data1)
     main_f  = relay.Function([data0, weight0, data1], out)
     mod = tvm.IRModule()
