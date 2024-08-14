@@ -55,10 +55,40 @@ from tvm.testing.aot import (
 #    output_list = generate_ref_data(mod, inputs)
 #    return mod, inputs, output_list, runner
 
-def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
+#def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
+#    dtype = "float32"
+#    ishape = (1, 32, 14, 14)
+#    wshape = (32, weight_shape, 3, 3)
+#    pass_config = {"tir.usmp.enable": True}
+#    runner = AOTRunner(
+#        makefile=runner.makefile,
+#        prologue=runner.prologue,
+#        epilogue=runner.epilogue,
+#        includes=runner.includes,
+#        parameters=runner.parameters,
+#        pass_config=pass_config,
+#    )
+#    data0   = relay.var("data", shape=ishape, dtype=dtype)
+#    weight0 = relay.var("weight", shape=wshape, dtype=dtype)
+#    data1   = relay.var("data1", shape=ishape, dtype=dtype)
+#    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(1, 1), groups=groups)
+#    out     = relay.add(convdt, data1)
+#    main_f  = relay.Function([data0, weight0, data1], out)
+#    mod = tvm.IRModule()
+#    mod["main"] = main_f
+#    mod = transform.InferType()(mod)
+#    i_data = np.random.uniform(0, 1, ishape).astype(dtype)
+#    w1_data = np.random.uniform(0, 1, wshape).astype(dtype)
+#    i_data1 = np.random.uniform(0, 1, ishape).astype(dtype)
+#    inputs = OrderedDict([("data", i_data), ("weight", w1_data), ("data1", i_data1)])
+#    output_list = generate_ref_data(mod, inputs)
+#    return mod, inputs, output_list, runner
+
+def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER):
     dtype = "float32"
     ishape = (1, 32, 14, 14)
-    wshape = (32, weight_shape, 5, 5)
+    wshape = (16, 32, 3, 3)
+    oshape = (1, 16, 1, 1)
     pass_config = {"tir.usmp.enable": True}
     runner = AOTRunner(
         makefile=runner.makefile,
@@ -70,8 +100,8 @@ def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
     )
     data0   = relay.var("data", shape=ishape, dtype=dtype)
     weight0 = relay.var("weight", shape=wshape, dtype=dtype)
-    data1   = relay.var("data1", shape=ishape, dtype=dtype)
-    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(5, 5), padding=(2, 2), groups=groups)
+    data1   = relay.var("data1", shape=oshape, dtype=dtype)
+    convdt  = relay.nn.conv2d(data0, weight0, kernel_size=(3, 3), padding=(1, 1), groups=groups)
     out     = relay.add(convdt, data1)
     main_f  = relay.Function([data0, weight0, data1], out)
     mod = tvm.IRModule()
@@ -79,7 +109,7 @@ def create_conv2d(groups=1, runner=AOT_DEFAULT_RUNNER, weight_shape=32):
     mod = transform.InferType()(mod)
     i_data = np.random.uniform(0, 1, ishape).astype(dtype)
     w1_data = np.random.uniform(0, 1, wshape).astype(dtype)
-    i_data1 = np.random.uniform(0, 1, ishape).astype(dtype)
+    i_data1 = np.random.uniform(0, 1, oshape).astype(dtype)
     inputs = OrderedDict([("data", i_data), ("weight", w1_data), ("data1", i_data1)])
     output_list = generate_ref_data(mod, inputs)
     return mod, inputs, output_list, runner
