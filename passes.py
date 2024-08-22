@@ -22,6 +22,7 @@ from tvm.relay.backend.contrib.uma.api.utils import add_llvm_to_block
 #from functools import reduce
 import pass_injective
 import pass_conv2d
+import pass_buffer
 import pass_utils
 
 @tvm.tir.transform.prim_func_pass(opt_level=2)
@@ -29,7 +30,9 @@ class VanillaAcceleratorTirPass:
     def transform_function(
         self, func: tvm.tir.PrimFunc, mod: tvm.ir.IRModule, ctx: tvm.ir.transform.PassContext
     ) -> tvm.tir.PrimFunc:
+        #update_func = pass_buffer.add_device_buffer(func, mod, ctx)
         update_func = pass_conv2d.conv2d_pass(func, mod, ctx)
         update_func = pass_injective.add_pass(update_func, mod, ctx)
+        update_func = pass_buffer.add_device_buffer(update_func, mod, ctx)
         return update_func
         #return self._vanilla_accelerator_add_pass(func, mod, ctx)

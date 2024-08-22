@@ -36,10 +36,13 @@ class VanillaAcceleratorBackend(UMABackend):
         self._register_pattern("conv2d", conv2d_pattern())
         self._register_pattern("add", gzadd_pattern())
 
-        # Relay to TIR function registration
+        # TIR pass registration
         #self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorConv2dPass())
         #self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorAddPass())
+        #self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorTirPass())
         self._register_tir_pass(PassPhase.TIR_PHASE_0, VanillaAcceleratorTirPass())
+
+        # Relay pass registration
 
         # TIR to runtime function registration
         self._register_codegen(fmt="c", includes=gen_includes)

@@ -34,49 +34,67 @@ from tvm.testing.aot import (
 #    dtype       = "float32"
 #    ishape1     = (1, 16, 14, 14)
 #    ishape2     = (1, 16, 14, 14)
-#    ishape3     = (1, 16, 14, 14)
 #    runner      = AOT_DEFAULT_RUNNER
 #    data0       = relay.var("data0", shape=ishape1, dtype=dtype)
 #    data1       = relay.var("data1", shape=ishape2, dtype=dtype)
-#    data2       = relay.var("data2", shape=ishape3, dtype=dtype)
-#    tmp         = relay.add(data0, data1)
-#    out         = relay.add(tmp, data2)
-#    main_f      = relay.Function([data0, data1, data2], out)
+#    out         = relay.add(data0, data1)
+#    main_f      = relay.Function([data0, data1], out)
 #    mod         = tvm.IRModule()
 #    mod["main"] = main_f
 #    mod         = transform.InferType()(mod)
 #    i_data0     = np.random.uniform(0, 1, ishape1).astype(dtype)
 #    i_data1     = np.random.uniform(0, 1, ishape2).astype(dtype)
-#    i_data2     = np.random.uniform(0, 1, ishape3).astype(dtype)
-#    inputs      = OrderedDict([("data0", i_data0), ("data1", i_data1), ("data2", i_data2)])
+#    inputs      = OrderedDict([("data0", i_data0), ("data1", i_data1)])
 #    output_list = generate_ref_data(mod, inputs)
 #    return mod, inputs, output_list, runner
 
 def create():
     dtype       = "float32"
     ishape1     = (1, 16, 14, 14)
+    ishape2     = (1, 16, 14, 14)
+    ishape3     = (1, 16, 14, 14)
     runner      = AOT_DEFAULT_RUNNER
     data0       = relay.var("data0", shape=ishape1, dtype=dtype)
-    data1       = relay.var("data1", shape=ishape1, dtype=dtype)
-    data2       = relay.var("data2", shape=ishape1, dtype=dtype)
-    data3       = relay.var("data3", shape=ishape1, dtype=dtype)
-    data4       = relay.var("data4", shape=ishape1, dtype=dtype)
+    data1       = relay.var("data1", shape=ishape2, dtype=dtype)
+    data2       = relay.var("data2", shape=ishape3, dtype=dtype)
     tmp         = relay.add(data0, data1)
-    tmp2        = relay.add(data2, data3)
-    tmp3        = relay.add(tmp, tmp2)
-    out         = relay.add(tmp3, data4)
-    main_f      = relay.Function([data0, data1, data2, data3, data4], out)
+    out         = relay.add(tmp, data2)
+    main_f      = relay.Function([data0, data1, data2], out)
     mod         = tvm.IRModule()
     mod["main"] = main_f
     mod         = transform.InferType()(mod)
     i_data0     = np.random.uniform(0, 1, ishape1).astype(dtype)
-    i_data1     = np.random.uniform(0, 1, ishape1).astype(dtype)
-    i_data2     = np.random.uniform(0, 1, ishape1).astype(dtype)
-    i_data3     = np.random.uniform(0, 1, ishape1).astype(dtype)
-    i_data4     = np.random.uniform(0, 1, ishape1).astype(dtype)
-    inputs      = OrderedDict([("data0", i_data0), ("data1", i_data1), ("data2", i_data2), ("data3", i_data3), ("data4", i_data4)])
+    i_data1     = np.random.uniform(0, 1, ishape2).astype(dtype)
+    i_data2     = np.random.uniform(0, 1, ishape3).astype(dtype)
+    inputs      = OrderedDict([("data0", i_data0), ("data1", i_data1), ("data2", i_data2)])
     output_list = generate_ref_data(mod, inputs)
     return mod, inputs, output_list, runner
+
+#def create():
+#    dtype       = "float32"
+#    ishape1     = (1, 16, 14, 14)
+#    runner      = AOT_DEFAULT_RUNNER
+#    data0       = relay.var("data0", shape=ishape1, dtype=dtype)
+#    data1       = relay.var("data1", shape=ishape1, dtype=dtype)
+#    data2       = relay.var("data2", shape=ishape1, dtype=dtype)
+#    data3       = relay.var("data3", shape=ishape1, dtype=dtype)
+#    data4       = relay.var("data4", shape=ishape1, dtype=dtype)
+#    tmp         = relay.add(data0, data1)
+#    tmp2        = relay.add(data2, data3)
+#    tmp3        = relay.add(tmp, tmp2)
+#    out         = relay.add(tmp3, data4)
+#    main_f      = relay.Function([data0, data1, data2, data3, data4], out)
+#    mod         = tvm.IRModule()
+#    mod["main"] = main_f
+#    mod         = transform.InferType()(mod)
+#    i_data0     = np.random.uniform(0, 1, ishape1).astype(dtype)
+#    i_data1     = np.random.uniform(0, 1, ishape1).astype(dtype)
+#    i_data2     = np.random.uniform(0, 1, ishape1).astype(dtype)
+#    i_data3     = np.random.uniform(0, 1, ishape1).astype(dtype)
+#    i_data4     = np.random.uniform(0, 1, ishape1).astype(dtype)
+#    inputs      = OrderedDict([("data0", i_data0), ("data1", i_data1), ("data2", i_data2), ("data3", i_data3), ("data4", i_data4)])
+#    output_list = generate_ref_data(mod, inputs)
+#    return mod, inputs, output_list, runner
 
 #def create():
 #    dtype       = "float32"
@@ -100,8 +118,8 @@ def create():
 def main():
     mod, inputs, output_list, runner = create()
 
-    with open("model_pre.dump", "w") as f:
-        f.write(str(mod))
+    #with open("model_pre.dump", "w") as f:
+    #    f.write(str(mod))
 
     uma_backend = VanillaAcceleratorBackend()
     uma_backend.register()
@@ -109,8 +127,8 @@ def main():
     target = tvm.target.Target("vanilla_accelerator", host=tvm.target.Target("c"))
     target_c = tvm.target.Target("c")
 
-    with open("model_post.dump", "w") as f:
-        f.write(str(mod))
+    #with open("model_post.dump", "w") as f:
+    #    f.write(str(mod))
 
     #export_directory = tvm.contrib.utils.tempdir(keep_for_debug=True).path
     export_directory = "result"
@@ -123,7 +141,6 @@ def main():
         target=[target_c, target],
         test_dir=str(export_directory),
     )
-
 
 if __name__ == "__main__":
     main()
